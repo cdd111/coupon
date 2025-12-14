@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ToB跨境电商 - 优惠券全链路演示</title>
+    <style>
+        :root {
+            --primary: #6200ee;         /* 品牌紫 */
+            --primary-light: #e0d4fc;   /* 浅紫 */
+            --red: #e02020;             /* 价格红 */
+            --orange: #ff6600;          /* 满减橙 */
+            --gold: #bfa15f;            /* 会员金 */
+            --bg-body: #d8dbe2;         /* 浏览器背景 */
+            --bg-app: #f5f7fa;          /* APP背景 */
+            --bar-applied: #fdfae6;     /* 已享优惠条背景 */
+            --bar-upsell: #fff0f0;      /* 待享优惠条背景 */
+        }
+
+        body {
+            margin: 0; padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "DIN Alternate", "PingFang SC", sans-serif;
+            background-color: var(--bg-body);
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* --- 手机外壳 (360px 宽度) --- */
+        .phone-frame {
+            width: 360px;
+            height: 780px;
+            background: var(--bg-app);
+            border-radius: 35px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+            border: 8px solid #222;
+            overflow: hidden;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* 顶部状态栏 */
+        .status-bar { height: 30px; background: white; display: flex; justify-content: space-between; padding: 0 15px; align-items: center; font-size: 12px; font-weight: bold; z-index: 10; }
+        
+        /* 通用导航栏 */
+        .nav-header { 
+            height: 44px; background: white; display: flex; align-items: center; justify-content: space-between; 
+            padding: 0 12px; font-size: 16px; font-weight: bold; border-bottom: 1px solid #f5f5f5; z-index: 10;
+        }
+        .icon-btn { font-size: 18px; color: #333; cursor: pointer; }
+
+        /* 内容滚动区 */
+        .page-content { flex: 1; overflow-y: auto; display: none; padding-bottom: 80px; scroll-behavior: smooth; }
+        .page-content.active { display: block; animation: fadeIn 0.2s ease; }
+
+        /* 通用卡片 */
+        .card { background: white; border-radius: 12px; padding: 12px; margin: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.02); }
+        
+        /* 底部 TabBar */
+        .tab-bar {
+            position: absolute; bottom: 0; width: 100%; height: 70px; background: white;
+            display: flex; justify-content: space-around; padding-top: 8px; box-sizing: border-box;
+            border-top: 1px solid #eee; z-index: 90; padding-bottom: 15px;
+        }
+        .tab-item { display: flex; flex-direction: column; align-items: center; color: #999; font-size: 10px; cursor: pointer; }
+        .tab-item.active { color: var(--primary); }
+        .tab-icon { font-size: 22px; margin-bottom: 3px; }
+
+        /* --- 页面 1: 商品详情 (PDP) --- */
+        .pdp-tabs { display: flex; justify-content: center; gap: 30px; border-bottom: 1px solid #eee; padding-bottom: 8px; font-weight: bold; color: #999; font-size: 14px; }
+        .pdp-tabs span.active { color: var(--primary); border-bottom: 2px solid var(--primary); color: #333; }
+
+        /* 极简阶梯价 */
+        .tier-grid { display: flex; justify-content: space-between; text-align: center; margin: 15px 0; }
+        .tier-cell { flex: 1; border-right: 1px dashed #eee; padding: 0 2px; }
+        .tier-cell:last-child { border-right: none; }
+        .tier-price { font-size: 20px; color: var(--red); font-weight: 800; font-family: 'DIN Alternate', sans-serif; line-height: 1; }
+        .tier-strike { text-decoration: line-through; color: #ccc; font-size: 10px; margin-top: 4px; }
+        .tier-qty { font-size: 10px; color: #999; margin-top: 6px; }
+
+        /* 信息条 */
+        .info-bar { border-radius: 6px; padding: 8px 10px; margin-bottom: 8px; font-size: 11px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
+        .bar-applied { background: var(--bar-applied); color: #8a6d3b; }
+        .bar-upsell { background: var(--bar-upsell); color: var(--red); }
+        .tag-outline { border: 1px solid var(--red); padding: 0 3px; border-radius: 3px; font-size: 9px; margin-right: 5px; }
+
+        /* --- 页面 2: 购物车 (Cart) --- */
+        .group-header { padding: 10px; font-weight: bold; font-size: 13px; display: flex; align-items: center; border-bottom: 1px solid #f9f9f9; }
+        .cart-item { display: flex; padding: 12px; border-bottom: 1px solid #f9f9f9; }
+        .checkbox { width: 18px; height: 18px; border-radius: 50%; border: 2px solid #ddd; margin-right: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .checkbox.checked { background: var(--primary); border-color: var(--primary); }
+        .checkbox.checked::after { content: '✓'; color: white; font-size: 10px; }
+        
+        .tag-coupon { background: #fff5f5; border: 1px solid #ffcccc; color: var(--red); font-size: 9px; padding: 0 3px; border-radius: 3px; display: inline-block; margin-bottom: 4px; }
+        .tag-threshold { background: #fff7e6; border: 1px solid #ffd591; color: var(--orange); font-size: 9px; padding: 0 3px; border-radius: 3px; display: inline-block; margin-bottom: 4px; }
+
+        .cart-bottom { position: absolute; bottom: 70px; width: 100%; background: white; padding: 10px 12px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 -2px 10px rgba(0,0,0,0.03); box-sizing: border-box; z-index: 80;}
+
+        /* --- 页面 3: 确认订单 --- */
+        .checkout-bar { position: absolute; bottom: 0; width: 100%; background: white; padding: 10px 15px 30px; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #eee; z-index: 100; box-sizing: border-box; }
+        .summary-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px; color: #333; }
+
+        /* --- 页面 4: 我的优惠券 --- */
+        .coupon-tabs { display: flex; background: white; position: sticky; top: 0; z-index: 5; }
+        .c-tab { flex: 1; text-align: center; padding: 12px 0; font-size: 13px; color: #666; cursor: pointer; }
+        .c-tab.active { color: var(--primary); font-weight: bold; border-bottom: 2px solid var(--primary); }
+        
+        /* 票据样式 */
+        .ticket { display: flex; background: white; margin: 12px; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 5px rgba(0,0,0,0.05); position: relative; }
+        .ticket-left { width: 90px; background: linear-gradient(135deg, #6200ee 0%, #8c4bff 100%); color: white; display: flex; flex-direction: column; justify-content: center; align-items: center; border-right: 1px dashed rgba(255,255,255,0.3); }
+        .ticket-right { flex: 1; padding: 12px; display: flex; flex-direction: column; justify-content: center; }
+        .ticket.expired .ticket-left { background: #ccc; }
+        .ticket.expired .ticket-right { color: #999; }
+        .stamp { position: absolute; right: 10px; top: 10px; border: 1px solid #999; padding: 2px 5px; transform: rotate(-15deg); font-size: 10px; border-radius: 3px; color: #999; }
+
+        /* --- 弹窗组件 --- */
+        .modal { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 200; }
+        .modal-content { position: absolute; bottom: 0; width: 100%; background: white; border-radius: 16px 16px 0 0; padding: 20px; box-sizing: border-box; animation: slideUp 0.3s; }
+        .modal-header { font-weight: bold; text-align: center; margin-bottom: 15px; font-size: 15px; }
+        
+        .calc-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px; }
+        .calc-op { width: 20px; text-align: center; color: #999; }
+
+        .btn-main { background: var(--primary); color: white; border: none; padding: 10px 25px; border-radius: 20px; font-weight: bold; font-size: 14px; }
+        .btn-full { width: 100%; padding: 12px; border-radius: 25px; background: var(--primary); color: white; border: none; font-weight: bold; margin-top: 10px;}
+
+        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    </style>
+</head>
+<body>
+
+<div class="phone-frame">
+    <!-- 状态栏 -->
+    <div class="status-bar">
+        <span>9:41</span>
+        <span>5G</span>
+    </div>
+
+    <!-- ================= 页面 1: 商品详情 (PDP) ================= -->
+    <div id="page-home" class="page-content active">
+        <div class="nav-header">
+            <span class="icon-btn">‹</span>
+            <span>商品详情</span>
+            <span class="icon-btn">···</span>
+        </div>
+        
+        <!-- 商品图 -->
+        <div style="height: 240px; background: white; display: flex; align-items: center; justify-content: center; color: #ccc;">Product Image</div>
+
+        <div class="card" style="margin-top:-20px; position:relative; z-index:2;">
+            <div class="pdp-tabs">
+                <span class="active">代 发</span>
+                <span>批 发</span>
+            </div>
+
+            <!-- 1. 清爽的阶梯价 (Clean Tier Grid) -->
+            <div class="tier-grid">
+                <div class="tier-cell">
+                    <div class="tier-price">¥41.72</div>
+                    <div class="tier-strike">¥46.36</div>
+                    <div class="tier-qty">≥1 pcs</div>
+                </div>
+                <div class="tier-cell">
+                    <div class="tier-price">¥40.37</div>
+                    <div class="tier-strike">¥44.86</div>
+                    <div class="tier-qty">100-499</div>
+                </div>
+                <div class="tier-cell">
+                    <div class="tier-price">¥36.77</div>
+                    <div class="tier-strike">¥40.86</div>
+                    <div class="tier-qty">≥500 pcs</div>
+                </div>
+            </div>
+
+            <!-- 2. 信息条 A: 已享优惠 (点击看公式) -->
+            <div class="info-bar bar-applied" onclick="openModal('modal-calc')">
+                <div style="display:flex; align-items:center;">
+                    <span style="color:var(--gold); font-weight:bold; margin-right:5px;">✓</span>
+                    <span>已享：钻石会员95折 + 95折券</span>
+                </div>
+                <span style="color:var(--gold);">计算公式 ></span>
+            </div>
+
+            <!-- 3. 信息条 B: 凑单提示 (点击看券) -->
+            <div class="info-bar bar-upsell" onclick="openModal('modal-coupon-detail')">
+                <div style="display:flex; align-items:center;">
+                    <span class="tag-outline">满减</span>
+                    <span>可再享满5000减200</span>
+                </div>
+                <span>去查看 ></span>
+            </div>
+
+            <div style="font-size:15px; font-weight:bold; margin-top:12px;">Rayhong 汽车挡风玻璃修复液</div>
+            <div style="font-size:11px; color:#999; margin-top:4px;">库存: 英国2仓 · 11335</div>
+        </div>
+
+        <div class="card">
+            <div style="display:flex; justify-content:space-between; font-size:13px;">
+                <span style="color:#666;">发货区域</span>
+                <span style="font-weight:bold;">🇨🇳 中国 ></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= 页面 2: 购物车 ================= -->
+    <div id="page-cart" class="page-content">
+        <div class="nav-header">
+            <span>采购车</span>
+            <span style="font-size:13px; font-weight:normal;">管理</span>
+        </div>
+
+        <div class="card" style="padding:0;">
+            <div class="group-header">
+                <span style="color:var(--primary); margin-right:5px;">●</span> 中国仓
+            </div>
+
+            <!-- 商品 1: 有折扣券 (显示折后价 + 划线价) -->
+            <div class="cart-item">
+                <div class="checkbox checked"></div>
+                <div style="width:70px; height:70px; background:#eee; border-radius:4px; margin-right:10px;"></div>
+                <div style="flex:1;">
+                    <div style="font-size:13px; font-weight:bold;">汽车修复液</div>
+                    <div style="margin:4px 0;">
+                        <span class="tag-coupon">9折券</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; align-items:end;">
+                        <div>
+                            <span class="tier-price" style="font-size:16px;">¥41.72</span>
+                            <span class="tier-strike">¥46.36</span>
+                        </div>
+                        <div style="font-size:12px; border:1px solid #eee; padding:2px 8px;">x 2</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 商品 2: 只有满减券 (显示原价 + 凑单标) -->
+            <div class="cart-item">
+                <div class="checkbox checked"></div>
+                <div style="width:70px; height:70px; background:#eee; border-radius:4px; margin-right:10px;"></div>
+                <div style="flex:1;">
+                    <div style="font-size:13px; font-weight:bold;">强效去污剂</div>
+                    <div style="margin:4px 0;">
+                        <span class="tag-threshold">满5000减200</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; align-items:end;">
+                        <div>
+                            <span class="tier-price" style="font-size:16px;">¥20.00</span>
+                            <!-- 无划线价 -->
+                        </div>
+                        <div style="font-size:12px; border:1px solid #eee; padding:2px 8px;">x 5</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 购物车底部 (独立于TabBar) -->
+        <div class="cart-bottom">
+            <div style="font-size:11px; color:#666;">
+                已选 2种7件<br>(不含运费)
+            </div>
+            <div style="display:flex; gap:10px; align-items:center;">
+                <!-- 点击查看明细 -->
+                <div style="text-align:right; cursor:pointer;" onclick="openModal('modal-price-breakdown')">
+                    <div style="color:var(--red); font-weight:bold; font-size:16px;">¥183.44 <span style="font-size:10px; color:#666;">∨</span></div>
+                    <div style="font-size:10px; color:var(--red);">已优惠 ¥9.28</div>
+                </div>
+                <button class="btn-main" onclick="switchPage('checkout')">结算</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= 页面 3: 确认订单 ================= -->
+    <div id="page-checkout" class="page-content">
+        <div class="nav-header">
+            <span class="icon-btn" onclick="switchPage('cart')">‹</span>
+            <span>确认订单</span>
+            <span></span>
+        </div>
+
+        <div class="card" style="display:flex; justify-content:space-between; align-items:center;">
+            <div>
+                <div style="font-weight:bold; font-size:15px;">张三 186****9999</div>
+                <div style="font-size:12px; color:#666; margin-top:4px;">广东省深圳市南山区...</div>
+            </div>
+            <span>></span>
+        </div>
+
+        <div class="card">
+            <div class="summary-row" style="border-bottom:1px solid #f5f5f5; padding-bottom:8px; font-weight:bold;">商品清单</div>
+            <div style="display:flex; margin-top:10px;">
+                <div style="width:50px; height:50px; background:#eee; margin-right:10px;"></div>
+                <div style="width:50px; height:50px; background:#eee; margin-right:10px;"></div>
+                <div style="align-self:center; font-size:12px; color:#999;">共7件</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="summary-row"><span>商品原价</span><span>¥192.72</span></div>
+            <div class="summary-row"><span>运费</span><span>¥10.00</span></div>
+            
+            <!-- 选券入口 -->
+            <div class="summary-row" style="padding:10px 0; border-top:1px dashed #eee; border-bottom:1px dashed #eee; cursor:pointer;" onclick="openModal('modal-select-coupon')">
+                <span>优惠券</span>
+                <div style="color:var(--red); display:flex; align-items:center;">
+                    - ¥9.28 <span style="color:#ccc; margin-left:5px;">></span>
+                </div>
+            </div>
+
+            <div class="summary-row" style="margin-top:10px; font-size:15px; font-weight:bold;">
+                <span>合计</span>
+                <span style="color:var(--red); font-size:18px;">¥193.44</span>
+            </div>
+        </div>
+
+        <div class="checkout-bar">
+            <div style="font-size:12px; color:#999;">共7件</div>
+            <button class="btn-main" onclick="alert('下单成功')">提交订单</button>
+        </div>
+    </div>
+
+    <!-- ================= 页面 4: 我的优惠券 ================= -->
+    <div id="page-coupon" class="page-content">
+        <div class="nav-header">
+            <span class="icon-btn" onclick="switchPage('my')">‹</span>
+            <span>我的优惠券</span>
+            <span></span>
+        </div>
+
+        <div class="coupon-tabs">
+            <div class="c-tab active">未使用(2)</div>
+            <div class="c-tab">已使用(1)</div>
+            <div class="c-tab">已过期(3)</div>
+        </div>
+
+        <div style="padding: 10px 0;">
+            <!-- 券 1 -->
+            <div class="ticket">
+                <div class="ticket-left">
+                    <div style="font-size:18px; font-weight:bold;">95折</div>
+                    <div style="font-size:10px;">折扣券</div>
+                </div>
+                <div class="ticket-right">
+                    <div style="font-weight:bold; font-size:14px;">数码品类95折</div>
+                    <div style="font-size:10px; color:#999; margin-top:5px;">2025.12.31 到期</div>
+                    <div style="font-size:10px; color:var(--red); margin-top:5px;">去使用 ></div>
+                </div>
+            </div>
+
+            <!-- 券 2 -->
+            <div class="ticket">
+                <div class="ticket-left">
+                    <div style="font-size:18px; font-weight:bold;">¥200</div>
+                    <div style="font-size:10px;">满减券</div>
+                </div>
+                <div class="ticket-right">
+                    <div style="font-weight:bold; font-size:14px;">满5000减200</div>
+                    <div style="font-size:10px; color:#999; margin-top:5px;">2025.10.01 到期</div>
+                </div>
+            </div>
+
+            <!-- 券 3 (失效状态演示) -->
+            <div class="ticket expired">
+                <div class="ticket-left">
+                    <div style="font-size:18px; font-weight:bold;">¥50</div>
+                </div>
+                <div class="ticket-right">
+                    <div style="font-weight:bold; font-size:14px;">新人体验券</div>
+                    <div style="font-size:10px; margin-top:5px;">2024.01.01 到期</div>
+                    <div class="stamp">已过期</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= 页面 5: 我的 (入口) ================= -->
+    <div id="page-my" class="page-content">
+        <div style="padding: 40px 20px 20px; background: linear-gradient(180deg, #e0d4fc 0%, #f5f7fa 100%);">
+            <div style="display:flex; align-items:center;">
+                <div style="width:60px; height:60px; background:#fff; border-radius:50%; margin-right:15px;"></div>
+                <div>
+                    <div style="font-size:18px; font-weight:bold;">慕容云海</div>
+                    <div style="font-size:11px; background:rgba(255,255,255,0.6); padding:2px 6px; border-radius:10px; display:inline-block;">💎 钻石会员</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div style="font-weight:bold; margin-bottom:15px;">我的服务</div>
+            <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:15px; text-align:center;">
+                <div style="font-size:11px; color:#666;">
+                    <div style="font-size:20px; margin-bottom:5px;">❤️</div>收藏
+                </div>
+                <div style="font-size:11px; color:#666;">
+                    <div style="font-size:20px; margin-bottom:5px;">📍</div>地址
+                </div>
+                <!-- 优惠券入口 -->
+                <div style="font-size:11px; color:#666; cursor:pointer;" onclick="switchPage('coupon')">
+                    <div style="font-size:20px; margin-bottom:5px;">🎟️</div>优惠券
+                </div>
+                <div style="font-size:11px; color:#666;">
+                    <div style="font-size:20px; margin-bottom:5px;">🎧</div>客服
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= 弹窗集合 ================= -->
+
+    <!-- 弹窗 1: PDP价格公式 -->
+    <div id="modal-calc" class="modal" onclick="closeModal('modal-calc')">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="modal-header">价格计算详情 (第1阶梯)</div>
+            <div class="calc-row"><span>基础单价</span><span>¥46.36</span></div>
+            <div class="calc-row"><span class="calc-op">×</span><span>钻石会员折扣</span><span style="color:var(--gold);">95折</span></div>
+            <div class="calc-row"><span class="calc-op">×</span><span>限时折扣券</span><span style="color:var(--red);">95折</span></div>
+            <div style="border-top:1px dashed #eee; margin:10px 0;"></div>
+            <div class="calc-row">
+                <span class="calc-op">=</span><span style="font-weight:bold;">最终单价</span>
+                <span class="tier-price">¥41.72</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 弹窗 2: 优惠券详情 -->
+    <div id="modal-coupon-detail" class="modal" onclick="closeModal('modal-coupon-detail')">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="modal-header">待享优惠</div>
+            <div class="ticket" style="box-shadow:none; border:1px solid #eee;">
+                <div class="ticket-left" style="background:var(--primary);">
+                    <div style="font-size:20px; font-weight:bold;">¥200</div>
+                </div>
+                <div class="ticket-right">
+                    <div style="font-weight:bold;">满5000减200</div>
+                    <div style="font-size:10px; color:#999;">全场通用</div>
+                </div>
+            </div>
+            <button class="btn-full" onclick="closeModal('modal-coupon-detail')">去凑单</button>
+        </div>
+    </div>
+
+    <!-- 弹窗 3: 购物车明细 -->
+    <div id="modal-price-breakdown" class="modal" onclick="closeModal('modal-price-breakdown')">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="modal-header">价格明细 (中国仓)</div>
+            <div class="calc-row"><span>商品原价</span><span>¥192.72</span></div>
+            <div class="calc-row" style="color:var(--red);"><span>[券] 9折优惠</span><span>- ¥9.28</span></div>
+            <div style="border-top:1px solid #eee; margin:10px 0;"></div>
+            <div class="calc-row"><span style="font-weight:bold;">合计 (不含运费)</span><span style="font-weight:bold; font-size:16px; color:var(--red)">¥183.44</span></div>
+        </div>
+    </div>
+
+    <!-- 弹窗 4: 确认订单选券 -->
+    <div id="modal-select-coupon" class="modal" onclick="closeModal('modal-select-coupon')">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="modal-header">选择优惠券</div>
+            <div class="ticket" style="border:1px solid var(--red); background:#fff5f5;">
+                <div class="ticket-left" style="background:var(--red);">
+                    <div style="font-size:14px; font-weight:bold;">9折</div>
+                </div>
+                <div class="ticket-right" style="flex-direction:row; align-items:center; justify-content:space-between;">
+                    <div>
+                        <div style="font-weight:bold; font-size:12px;">数码品类9折</div>
+                        <div style="font-size:10px; color:var(--red);">省 ¥9.28</div>
+                    </div>
+                    <div style="color:var(--red);">●</div>
+                </div>
+            </div>
+            <div class="ticket" style="border:1px solid #eee;">
+                <div class="ticket-left" style="background:#ccc;">
+                    <div style="font-size:14px; font-weight:bold;">¥200</div>
+                </div>
+                <div class="ticket-right">
+                    <div style="color:#999; font-size:12px;">满5000减200</div>
+                    <div style="font-size:10px; color:#999;">未满足门槛</div>
+                </div>
+            </div>
+            <button class="btn-full" onclick="closeModal('modal-select-coupon')">确定</button>
+        </div>
+    </div>
+
+    <!-- 底部 TabBar -->
+    <div class="tab-bar">
+        <div class="tab-item active" onclick="switchPage('home')">
+            <span class="tab-icon">🏠</span>首页
+        </div>
+        <div class="tab-item" onclick="switchPage('home')">
+            <span class="tab-icon">📦</span>货盘
+        </div>
+        <div class="tab-item" onclick="switchPage('cart')">
+            <span class="tab-icon">🛒</span>采购车
+        </div>
+        <div class="tab-item" onclick="switchPage('my')">
+            <span class="tab-icon">👤</span>我的
+        </div>
+    </div>
+</div>
+
+<script>
+    function switchPage(pageId) {
+        document.querySelectorAll('.page-content').forEach(el => el.classList.remove('active'));
+        document.getElementById('page-' + pageId).classList.add('active');
+        
+        // 更新 Tab 状态
+        document.querySelectorAll('.tab-item').forEach(el => el.classList.remove('active'));
+        if(pageId === 'home') document.querySelectorAll('.tab-item')[0].classList.add('active');
+        if(pageId === 'cart') document.querySelectorAll('.tab-item')[2].classList.add('active');
+        if(pageId === 'my' || pageId === 'coupon') document.querySelectorAll('.tab-item')[3].classList.add('active');
+    }
+
+    function openModal(id) { document.getElementById(id).style.display = 'block'; }
+    function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+</script>
+
+</body>
+</html>
